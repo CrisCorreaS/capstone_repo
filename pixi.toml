@@ -1,0 +1,13 @@
+[workspace]
+name = "diabetes-cgm-analysis"
+channels = ["conda-forge"]
+platforms = ["win-64"]
+
+[dependencies]
+python = "3.12.*"
+pandas = "3.1.*"
+numpy = "2.5.*"
+matplotlib = "3.11.*"
+scikit-learn = "1.9.*"
+seaborn = "0.13.*"
+jupyter = "1.1.*"
