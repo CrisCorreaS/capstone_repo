@@ -1,0 +1,45 @@
+name: Reproducibility problem
+description: Report a problem reproducing an analysis or result.
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Version, release, or commit
+      description: Specify the version, release tag, or commit identifier you are using.
+    validations:
+      required: true
+  - type: input
+    id: operating-system
+    attributes:
+      label: Operating system
+      description: Include the operating system name and version.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Command executed and steps to reproduce
+      description: Include the exact command and steps to reproduce the problem. For notebooks, identify the notebook and cells you ran.
+    validations:
+      required: true
+  - type: textarea
+    id: expected-result
+    attributes:
+      label: Expected result
+      description: Describe what you expected to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: actual-result
+    attributes:
+      label: Actual result and error output
+      description: Describe what happened and paste any error output. If there was no error message, say so.
+    validations:
+      required: true
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional context
+      description: Optionally add any other details that may help reproduce the problem.
+    validations:
+      required: false
