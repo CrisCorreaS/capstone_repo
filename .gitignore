@@ -16,3 +16,6 @@ Desktop.ini
 
 # Local Pixi environment
 .pixi/
+
+# Raw data is downloaded and verified
+/data/raw/
