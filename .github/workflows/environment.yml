@@ -33,6 +33,15 @@ jobs:
           pixi install --locked
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Download and verify CGM data
+        env:
+          CGM_DATA_PATH: ${{ runner.temp }}/cgm-data
+        run: |
+          pixi run --locked download-data --destination "$env:CGM_DATA_PATH"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pixi run --locked download-data --destination "$env:CGM_DATA_PATH" --verify-only
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Check Python and Jupyter versions
         run: |
           pixi run --locked python --version
@@ -45,12 +54,15 @@ jobs:
           pixi run --locked python -B -c "import pandas, numpy, matplotlib.pyplot, sklearn, seaborn; print('Scientific package imports OK')"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: Check initial raw data totals
+      - name: Check downloaded raw data totals
+        env:
+          CGM_DATA_PATH: ${{ runner.temp }}/cgm-data
         run: |
           @'
+          import os
           from src.data_utils import load_dataset
 
-          _, participants = load_dataset(data_path="data/raw")
+          _, participants = load_dataset(data_path=os.environ["CGM_DATA_PATH"])
           participant_count = len(participants)
           record_count = sum(len(records) for records in participants.values())
           print(f"Participants: {participant_count}; raw CGM records: {record_count:,}")
