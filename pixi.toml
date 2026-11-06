@@ -11,3 +11,6 @@ matplotlib = "3.11.*"
 scikit-learn = "1.9.*"
 seaborn = "0.13.*"
 jupyter = "1.1.*"
+
+[tasks]
+download-data = "python -B src/download_data.py"
