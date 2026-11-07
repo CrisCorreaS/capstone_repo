@@ -23,3 +23,8 @@ Desktop.ini
 # Generated analysis outputs
 /data/processed/
 /results/tables/
+
+# Generated report and Quarto caches
+/reports/cgm-report.html
+/reports/cgm-report_files/
+/.quarto/
