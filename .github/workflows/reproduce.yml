@@ -1,0 +1,89 @@
+name: Reproduce
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    tags: ['**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reproduce:
+    runs-on: windows-2025
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Fresh clone
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Pixi
+        uses: prefix-dev/setup-pixi@9936258fee697aff89b3fed6ca1f80a382ef694e # v0.11.3
+        with:
+          pixi-version: v0.83.0
+          run-install: false
+          cache: false
+
+      - name: Install locked environment
+        run: |
+          pixi install --locked
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Rebuild processed data and result tables
+        run: |
+          pixi run reproduce
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Check raw data totals and generated CSVs
+        run: |
+          @'
+          from pathlib import Path
+          import pandas as pd
+          from src.data_utils import load_dataset
+
+          _, participants = load_dataset(data_path="data/raw")
+          participant_count = len(participants)
+          record_count = sum(len(records) for records in participants.values())
+          print(f"Participants: {participant_count}; raw CGM records: {record_count:,}")
+          assert participant_count == 208, f"Expected 208 participants, got {participant_count}"
+          assert record_count == 114_912, f"Expected 114,912 raw CGM records, got {record_count:,}"
+
+          quality_path = Path("data/processed/quality_summary.csv")
+          quality = pd.read_csv(quality_path)
+          selected = quality.loc[quality["final_quality_v2"] == "good", "case_id"]
+          expected = {Path(f"data/processed/interpolated/case_{case_id}.csv") for case_id in selected}
+          expected.add(quality_path)
+          expected.update(Path("results/tables") / name for name in (
+              "metrics_summary.csv", "final_dataset.csv", "group_comparison.csv"
+          ))
+          assert len(expected) == 118, f"Expected 118 generated CSVs, got {len(expected)}"
+          actual = set(Path("data/processed").rglob("*.csv")) | set(Path("results/tables").glob("*.csv"))
+          assert actual == expected, f"Missing CSVs: {sorted(expected - actual)}; unexpected CSVs: {sorted(actual - expected)}"
+          assert all(path.is_file() for path in expected), "An expected CSV is not a file"
+          print(f"Verified {len(expected)} generated CSVs.")
+          '@ | pixi run --locked python -s -B -
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Committed files must not change when the analysis runs
+        if: always()
+        run: |
+          git status --porcelain
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git diff --exit-code
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Keep result tables for seven days
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: result-tables
+          path: results/tables/*.csv
+          if-no-files-found: warn
+          retention-days: 7
