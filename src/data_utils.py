@@ -3,8 +3,18 @@ from pathlib import Path
 import pandas as pd
 
 
-def load_clinical_data(data_path="../data/raw", filename="clinical_data.txt"):
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _resolve_data_path(data_path):
+    """Resolve relative data paths from the project root; preserve absolute paths."""
     data_path = Path(data_path)
+    return data_path if data_path.is_absolute() else PROJECT_ROOT / data_path
+
+
+def load_clinical_data(data_path="data/raw", filename="clinical_data.txt"):
+    """Load clinical data; data_path is project-relative or absolute."""
+    data_path = _resolve_data_path(data_path)
     clinical_path = data_path / filename
 
     if not clinical_path.exists():
@@ -15,8 +25,9 @@ def load_clinical_data(data_path="../data/raw", filename="clinical_data.txt"):
     return clinical
 
 
-def load_case(case_id, data_path="../data/raw", cases_folder="cases"):
-    data_path = Path(data_path)
+def load_case(case_id, data_path="data/raw", cases_folder="cases"):
+    """Load one participant; data_path is project-relative or absolute."""
+    data_path = _resolve_data_path(data_path)
     # Usar doble espacio para coincidir con los nombres reales
     filename = f"case  {case_id}.csv"
     if cases_folder is None:
@@ -31,7 +42,8 @@ def load_case(case_id, data_path="../data/raw", cases_folder="cases"):
     return df
 
 
-def load_all_cases(data_path="../data/raw", cases_folder="cases", n_cases=208):
+def load_all_cases(data_path="data/raw", cases_folder="cases", n_cases=208):
+    """Load participants in case-number order; data_path is project-relative or absolute."""
     patients = {}
 
     for case_id in range(1, n_cases + 1):
@@ -44,14 +56,16 @@ def load_all_cases(data_path="../data/raw", cases_folder="cases", n_cases=208):
     return patients
 
 
-def load_dataset(data_path="../data/raw", clinical_filename="clinical_data.txt", n_cases=208):
+def load_dataset(data_path="data/raw", clinical_filename="clinical_data.txt", n_cases=208):
+    """Load clinical data and participants; data_path is project-relative or absolute."""
+    data_path = _resolve_data_path(data_path)
     clinical = load_clinical_data(
         data_path=data_path,
         filename=clinical_filename
     )
 
     # Detectar automáticamente el folder de casos
-    cases_folder = "cases" if (Path(data_path) / "cases").exists() else None
+    cases_folder = "cases" if (data_path / "cases").exists() else None
     patients = load_all_cases(
         data_path=data_path,
         cases_folder=cases_folder,
