@@ -19,3 +19,4 @@ ipykernel = "==7.4.0"
 [tasks]
 download-data = "python -B src/download_data.py"
 reproduce = "python -I -B src/reproduce.py"
+check-outputs = "python -I -B src/check_outputs.py"
