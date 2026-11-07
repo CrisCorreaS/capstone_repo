@@ -14,6 +14,10 @@ from jupyter_client.kernelspec import KernelSpecManager
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+from src.analysis_config import load_analysis_config
+
 NOTEBOOKS = ("01_data_exploration.ipynb", "02_metrics.ipynb")
 TABLES = ("metrics_summary.csv", "final_dataset.csv", "group_comparison.csv")
 
@@ -60,7 +64,7 @@ def prepare_outputs():
     print(f"Prepared output directories; removed {removed} recognised generated CSVs.", flush=True)
 
 
-def execute_notebook(name, notebook, diagnostics):
+def execute_notebook(name, notebook, diagnostics, timeout_seconds):
     manager = AsyncKernelManager(
         kernel_name="cgm-pixi",
         kernel_spec_manager=KernelSpecManager(
@@ -73,7 +77,7 @@ def execute_notebook(name, notebook, diagnostics):
             cell.execution_count = None
     client = NotebookClient(
         notebook, km=manager, kernel_name="cgm-pixi",
-        allow_errors=False, force_raise_errors=True, timeout=1800,
+        allow_errors=False, force_raise_errors=True, timeout=timeout_seconds,
     )
     print(f"Executing {name} in a fresh Pixi kernel...", flush=True)
     try:
@@ -99,6 +103,8 @@ def main():
             or not prefix or Path(prefix).resolve() != Path(sys.prefix).resolve()
         ):
             raise RuntimeError("Run this entry point with pixi run reproduce.")
+
+        analysis_config = load_analysis_config(PROJECT_ROOT)
 
         print("Acquiring or verifying raw inputs...", flush=True)
         subprocess.run(
@@ -132,7 +138,10 @@ def main():
             json.dumps(kernel_spec, indent=2), encoding="utf-8"
         )
         for name, notebook in notebooks:
-            execute_notebook(name, notebook, diagnostics)
+            execute_notebook(
+                name, notebook, diagnostics,
+                timeout_seconds=analysis_config["execution"]["notebook_cell_timeout_seconds"],
+            )
         print("Processed data and result tables regenerated.", flush=True)
         return 0
     except Exception as error:

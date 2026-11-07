@@ -2,3 +2,25 @@
 # Missing-data percentages; existing upper-bound comparisons are exclusive (<).
 good_missing_pct_threshold = 10
 medium_missing_pct_threshold = 30
+# Edge-window sizes and terminal allowance are counts of samples.
+edge_window_samples = 10
+selection_edge_window_samples = 3
+terminal_missing_samples = 3
+
+[sample_entropy]
+embedding_dimension = 2
+# Multiply the series standard deviation by this dimensionless factor.
+tolerance_sd_multiplier = 0.2
+
+[dfa]
+min_window_samples = 4
+# Number of candidate log-spaced sizes, before rounding and deduplication.
+window_count = 12
+
+[gaps]
+# A long gap must be strictly greater than this duration in minutes.
+long_gap_minutes = 10
+
+[execution]
+# Maximum execution time per code cell, in seconds.
+notebook_cell_timeout_seconds = 1800
