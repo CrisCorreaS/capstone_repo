@@ -19,3 +19,7 @@ Desktop.ini
 
 # Raw data is downloaded and verified
 /data/raw/
+
+# Generated analysis outputs
+/data/processed/
+/results/tables/
