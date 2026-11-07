@@ -1,0 +1,4 @@
+[quality]
+# Missing-data percentages; existing upper-bound comparisons are exclusive (<).
+good_missing_pct_threshold = 10
+medium_missing_pct_threshold = 30
