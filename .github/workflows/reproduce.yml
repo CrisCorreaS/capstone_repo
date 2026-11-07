@@ -43,32 +43,7 @@ jobs:
 
       - name: Check raw data totals and generated CSVs
         run: |
-          @'
-          from pathlib import Path
-          import pandas as pd
-          from src.data_utils import load_dataset
-
-          _, participants = load_dataset(data_path="data/raw")
-          participant_count = len(participants)
-          record_count = sum(len(records) for records in participants.values())
-          print(f"Participants: {participant_count}; raw CGM records: {record_count:,}")
-          assert participant_count == 208, f"Expected 208 participants, got {participant_count}"
-          assert record_count == 114_912, f"Expected 114,912 raw CGM records, got {record_count:,}"
-
-          quality_path = Path("data/processed/quality_summary.csv")
-          quality = pd.read_csv(quality_path)
-          selected = quality.loc[quality["final_quality_v2"] == "good", "case_id"]
-          expected = {Path(f"data/processed/interpolated/case_{case_id}.csv") for case_id in selected}
-          expected.add(quality_path)
-          expected.update(Path("results/tables") / name for name in (
-              "metrics_summary.csv", "final_dataset.csv", "group_comparison.csv"
-          ))
-          assert len(expected) == 118, f"Expected 118 generated CSVs, got {len(expected)}"
-          actual = set(Path("data/processed").rglob("*.csv")) | set(Path("results/tables").glob("*.csv"))
-          assert actual == expected, f"Missing CSVs: {sorted(expected - actual)}; unexpected CSVs: {sorted(actual - expected)}"
-          assert all(path.is_file() for path in expected), "An expected CSV is not a file"
-          print(f"Verified {len(expected)} generated CSVs.")
-          '@ | pixi run --locked python -s -B -
+          pixi run --locked check-outputs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Committed files must not change when the analysis runs

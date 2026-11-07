@@ -1,3 +1,4 @@
+import argparse
 import json
 import os
 from pathlib import Path
@@ -14,6 +15,11 @@ from jupyter_client.kernelspec import KernelSpecManager
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+from src.analysis_config import load_analysis_config
+from src.check_outputs import check_outputs
+
 NOTEBOOKS = ("01_data_exploration.ipynb", "02_metrics.ipynb")
 TABLES = ("metrics_summary.csv", "final_dataset.csv", "group_comparison.csv")
 
@@ -60,7 +66,7 @@ def prepare_outputs():
     print(f"Prepared output directories; removed {removed} recognised generated CSVs.", flush=True)
 
 
-def execute_notebook(name, notebook, diagnostics):
+def execute_notebook(name, notebook, diagnostics, timeout_seconds):
     manager = AsyncKernelManager(
         kernel_name="cgm-pixi",
         kernel_spec_manager=KernelSpecManager(
@@ -73,7 +79,7 @@ def execute_notebook(name, notebook, diagnostics):
             cell.execution_count = None
     client = NotebookClient(
         notebook, km=manager, kernel_name="cgm-pixi",
-        allow_errors=False, force_raise_errors=True, timeout=1800,
+        allow_errors=False, force_raise_errors=True, timeout=timeout_seconds,
     )
     print(f"Executing {name} in a fresh Pixi kernel...", flush=True)
     try:
@@ -89,7 +95,54 @@ def execute_notebook(name, notebook, diagnostics):
     print(f"Completed {name}.", flush=True)
 
 
-def main():
+def analyse(analysis_config, diagnostics):
+    """Verify existing raw inputs, prepare outputs and execute both notebooks."""
+    print("Verifying raw inputs without downloading...", flush=True)
+    subprocess.run(
+        [sys.executable, "-I", "-B", str(PROJECT_ROOT / "src/download_data.py"), "--verify-only"],
+        cwd=PROJECT_ROOT, check=True,
+    )
+    check_output_path(PROJECT_ROOT / "notebooks", directory=True)
+    for name in NOTEBOOKS:
+        check_output_path(PROJECT_ROOT / "notebooks" / name)
+    notebooks = [
+        (name, nbformat.read(PROJECT_ROOT / "notebooks" / name, as_version=4))
+        for name in NOTEBOOKS
+    ]
+    prepare_outputs()
+
+    kernel_directory = diagnostics / "kernels/cgm-pixi"
+    kernel_directory.mkdir(parents=True)
+    kernel_spec = {
+        "argv": [sys.executable, "-I", "-B", "-m", "ipykernel_launcher", "-f", "{connection_file}"],
+        "display_name": "Active Pixi Python", "language": "python",
+        "env": {
+            "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": "", "PYTHONNOUSERSITE": "1",
+            "IPYTHONDIR": str(diagnostics / "ipython"),
+            "MPLCONFIGDIR": str(diagnostics / "matplotlib"),
+            "JUPYTER_CONFIG_DIR": str(diagnostics / "jupyter-config"),
+        },
+    }
+    (kernel_directory / "kernel.json").write_text(
+        json.dumps(kernel_spec, indent=2), encoding="utf-8"
+    )
+    for name, notebook in notebooks:
+        execute_notebook(
+            name, notebook, diagnostics,
+            timeout_seconds=analysis_config["execution"]["notebook_cell_timeout_seconds"],
+        )
+    print("Processed data and result tables regenerated.", flush=True)
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="Run the CGM analysis or complete reproduction.")
+    parser.add_argument(
+        "--analyse-only", action="store_true",
+        help="Verify existing inputs and execute the notebooks without downloading data.",
+    )
+    args = parser.parse_args(argv)
+    task = "analyse" if args.analyse_only else "reproduce"
+    action = "Analysis" if args.analyse_only else "Reproduction"
     diagnostics = None
     try:
         pixi_root = os.environ.get("PIXI_PROJECT_ROOT")
@@ -98,50 +151,31 @@ def main():
             not pixi_root or Path(pixi_root).resolve() != PROJECT_ROOT
             or not prefix or Path(prefix).resolve() != Path(sys.prefix).resolve()
         ):
-            raise RuntimeError("Run this entry point with pixi run reproduce.")
+            raise RuntimeError(f"Run this entry point with pixi run {task}.")
 
-        print("Acquiring or verifying raw inputs...", flush=True)
-        subprocess.run(
-            [sys.executable, "-I", "-B", str(PROJECT_ROOT / "src/download_data.py")],
-            cwd=PROJECT_ROOT, check=True,
-        )
-        check_output_path(PROJECT_ROOT / "notebooks", directory=True)
-        for name in NOTEBOOKS:
-            check_output_path(PROJECT_ROOT / "notebooks" / name)
-        notebooks = [
-            (name, nbformat.read(PROJECT_ROOT / "notebooks" / name, as_version=4))
-            for name in NOTEBOOKS
-        ]
-        prepare_outputs()
+        analysis_config = load_analysis_config(PROJECT_ROOT)
 
+        if not args.analyse_only:
+            print("Acquiring or verifying raw inputs...", flush=True)
+            subprocess.run(
+                [sys.executable, "-I", "-B", str(PROJECT_ROOT / "src/download_data.py")],
+                cwd=PROJECT_ROOT, check=True,
+            )
         diagnostics = Path(tempfile.mkdtemp(prefix="cgm-reproduce-"))
         print(f"Execution copies and logs: {diagnostics}", flush=True)
-        kernel_directory = diagnostics / "kernels/cgm-pixi"
-        kernel_directory.mkdir(parents=True)
-        kernel_spec = {
-            "argv": [sys.executable, "-I", "-B", "-m", "ipykernel_launcher", "-f", "{connection_file}"],
-            "display_name": "Active Pixi Python", "language": "python",
-            "env": {
-                "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": "", "PYTHONNOUSERSITE": "1",
-                "IPYTHONDIR": str(diagnostics / "ipython"),
-                "MPLCONFIGDIR": str(diagnostics / "matplotlib"),
-                "JUPYTER_CONFIG_DIR": str(diagnostics / "jupyter-config"),
-            },
-        }
-        (kernel_directory / "kernel.json").write_text(
-            json.dumps(kernel_spec, indent=2), encoding="utf-8"
-        )
-        for name, notebook in notebooks:
-            execute_notebook(name, notebook, diagnostics)
-        print("Processed data and result tables regenerated.", flush=True)
+        analyse(analysis_config, diagnostics)
+        if not args.analyse_only:
+            print("Validating generated outputs...", flush=True)
+            check_outputs()
+            print("Reproduction completed.", flush=True)
         return 0
     except Exception as error:
         if diagnostics is not None:
             (diagnostics / "error.log").write_text(traceback.format_exc(), encoding="utf-8")
-        print(f"Reproduction failed: {error}", file=sys.stderr)
+        print(f"{action} failed: {error}", file=sys.stderr)
         return 1
     except KeyboardInterrupt:
-        print("Reproduction interrupted.", file=sys.stderr)
+        print(f"{action} interrupted.", file=sys.stderr)
         return 130
 
 
