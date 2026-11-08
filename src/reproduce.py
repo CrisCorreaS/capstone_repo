@@ -1,4 +1,6 @@
 import argparse
+import asyncio
+from contextlib import redirect_stdout
 import json
 import os
 from pathlib import Path
@@ -25,7 +27,6 @@ TABLES = ("metrics_summary.csv", "final_dataset.csv", "group_comparison.csv")
 
 
 def check_output_path(path, directory=False):
-    """Reject redirected paths before inspecting or removing generated files."""
     for component in reversed((path, *path.parents)):
         if component.is_symlink() or component.is_junction():
             raise RuntimeError(f"Refusing a link or junction: {component}")
@@ -52,7 +53,6 @@ def prepare_outputs():
             elif path.name.lower().startswith("case_") and path.name.lower().endswith(".csv"):
                 raise RuntimeError(f"Unrecognised participant CSV; left unchanged: {path}")
 
-    # Validate the whole removal list before deleting anything, then recheck each file.
     for path in outputs:
         check_output_path(path)
     for directory in (interpolated, tables):
@@ -69,6 +69,7 @@ def prepare_outputs():
 def execute_notebook(name, notebook, diagnostics, timeout_seconds):
     manager = AsyncKernelManager(
         kernel_name="cgm-pixi",
+        transport_encryption="required",
         kernel_spec_manager=KernelSpecManager(
             kernel_dirs=[str(diagnostics / "kernels")], ensure_native_kernel=False
         ),
@@ -86,22 +87,20 @@ def execute_notebook(name, notebook, diagnostics, timeout_seconds):
         with (diagnostics / f"{name}.kernel.log").open("wb") as kernel_log:
             client.execute(
                 cwd=str(PROJECT_ROOT / "notebooks"), cleanup_kc=True,
-                stdout=kernel_log, stderr=kernel_log,
+                stdout=kernel_log,
             )
     except Exception as error:
         raise RuntimeError(f"Failed notebook {name}: {error}") from error
     finally:
         nbformat.write(notebook, diagnostics / name)
-    print(f"Completed {name}.", flush=True)
 
 
 def analyse(analysis_config, diagnostics):
-    """Verify existing raw inputs, prepare outputs and execute both notebooks."""
-    print("Verifying raw inputs without downloading...", flush=True)
-    subprocess.run(
-        [sys.executable, "-I", "-B", str(PROJECT_ROOT / "src/download_data.py"), "--verify-only"],
-        cwd=PROJECT_ROOT, check=True,
-    )
+    with (diagnostics / "verify-inputs.log").open("w", encoding="utf-8") as log:
+        subprocess.run(
+            [sys.executable, "-I", "-B", str(PROJECT_ROOT / "src/download_data.py"), "--verify-only"],
+            cwd=PROJECT_ROOT, check=True, stdout=log,
+        )
     check_output_path(PROJECT_ROOT / "notebooks", directory=True)
     for name in NOTEBOOKS:
         check_output_path(PROJECT_ROOT / "notebooks" / name)
@@ -109,13 +108,16 @@ def analyse(analysis_config, diagnostics):
         (name, nbformat.read(PROJECT_ROOT / "notebooks" / name, as_version=4))
         for name in NOTEBOOKS
     ]
-    prepare_outputs()
+    with (diagnostics / "prepare-outputs.log").open("w", encoding="utf-8") as log:
+        with redirect_stdout(log):
+            prepare_outputs()
 
     kernel_directory = diagnostics / "kernels/cgm-pixi"
     kernel_directory.mkdir(parents=True)
     kernel_spec = {
         "argv": [sys.executable, "-I", "-B", "-m", "ipykernel_launcher", "-f", "{connection_file}"],
         "display_name": "Active Pixi Python", "language": "python",
+        "metadata": {"supported_encryption": ["curve"]},
         "env": {
             "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": "", "PYTHONNOUSERSITE": "1",
             "IPYTHONDIR": str(diagnostics / "ipython"),
@@ -131,11 +133,9 @@ def analyse(analysis_config, diagnostics):
             name, notebook, diagnostics,
             timeout_seconds=analysis_config["execution"]["notebook_cell_timeout_seconds"],
         )
-    print("Processed data and result tables regenerated.", flush=True)
 
 
 def render_report():
-    """Render the report using the active environment and existing outputs."""
     print("Rendering the CGM data-quality report...", flush=True)
     try:
         subprocess.run(
@@ -152,6 +152,8 @@ def render_report():
 
 
 def main(argv=None):
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     parser = argparse.ArgumentParser(description="Run the CGM analysis or complete reproduction.")
     parser.add_argument(
         "--analyse-only", action="store_true",
@@ -172,20 +174,25 @@ def main(argv=None):
 
         analysis_config = load_analysis_config(PROJECT_ROOT)
 
-        if not args.analyse_only:
-            print("Acquiring or verifying raw inputs...", flush=True)
-            subprocess.run(
-                [sys.executable, "-I", "-B", str(PROJECT_ROOT / "src/download_data.py")],
-                cwd=PROJECT_ROOT, check=True,
-            )
         diagnostics = Path(tempfile.mkdtemp(prefix="cgm-reproduce-"))
         print(f"Execution copies and logs: {diagnostics}", flush=True)
+        if not args.analyse_only:
+            print("Acquiring or verifying raw inputs...", flush=True)
+            with (diagnostics / "acquire-inputs.log").open("w", encoding="utf-8") as log:
+                subprocess.run(
+                    [sys.executable, "-I", "-B", str(PROJECT_ROOT / "src/download_data.py")],
+                    cwd=PROJECT_ROOT, check=True, stdout=log,
+                )
+        else:
+            print("Verifying existing raw inputs...", flush=True)
         analyse(analysis_config, diagnostics)
         if not args.analyse_only:
             print("Validating generated outputs...", flush=True)
-            check_outputs()
+            with (diagnostics / "check-outputs.log").open("w", encoding="utf-8") as log:
+                with redirect_stdout(log):
+                    check_outputs()
             render_report()
-            print("Reproduction completed.", flush=True)
+        print(f"{action} completed.", flush=True)
         return 0
     except Exception as error:
         if diagnostics is not None:

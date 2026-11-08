@@ -1,0 +1,86 @@
+:root {
+  --report-accent: #BC2351;
+  --report-tint: #fbeef2;
+}
+
+body {
+  background: #fff;
+  color: #252a30;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+#quarto-document-content {
+  min-width: 0;
+}
+
+#title-block-header {
+  border-bottom: 3px solid var(--report-accent);
+  padding-bottom: 1rem;
+  margin-bottom: 1.75rem;
+}
+
+h1, h2 {
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+h1.title {
+  font-size: clamp(24px, 3vw, 28px);
+}
+
+h2 {
+  font-size: 21px;
+  margin-top: 2rem;
+}
+
+a {
+  color: var(--report-accent);
+  text-underline-offset: 0.15em;
+  overflow-wrap: anywhere;
+}
+
+a:hover, a:focus-visible {
+  color: #8d1a3d;
+}
+
+code {
+  color: #8d1a3d;
+  overflow-wrap: anywhere;
+}
+
+#fig-raw-records figure,
+#fig-raw-records img {
+  max-width: 100%;
+}
+
+#fig-raw-records img {
+  display: block;
+  width: 100%;
+  max-width: min(100%, 720px);
+  height: auto;
+  margin-inline: auto;
+}
+
+#tbl-final-quality th {
+  background: var(--report-tint);
+  color: #5e1229;
+}
+
+#tbl-final-quality table {
+  --bs-table-bg: #fff;
+  --bs-table-striped-bg: #fdf6f8;
+}
+
+#tbl-final-quality th,
+#tbl-final-quality td {
+  padding: 0.65rem 0.8rem;
+  border-bottom: 1px solid #ead3db;
+}
+
+.quarto-float-caption {
+  color: #515963;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
