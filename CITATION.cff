@@ -1,0 +1,62 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite this reproducibility capstone using these metadata."
+type: software
+title: "Diabetes CGM Analysis Project: reproducibility capstone"
+authors:
+  - given-names: Martin
+    family-names: Rivero
+  - given-names: Cristina
+    family-names: Correa Segade
+    orcid: "https://orcid.org/0009-0006-5667-9296"
+abstract: >-
+  An academic fork of Martin Rivero's original continuous glucose monitoring
+  analysis for a reproducibility capstone. Cristina Correa Segade
+  contributed the locked environment, verified data acquisition, automated
+  reproduction and reporting.
+repository-code: "https://github.com/CrisCorreaS/capstone_repo"
+license: MIT
+references:
+  - type: software
+    title: "Diabetes CGM Analysis Project"
+    authors:
+      - given-names: Martin
+        family-names: Rivero
+    repository-code: "https://github.com/martinrivero15/cgm-variability-analysis"
+  - type: article
+    title: >-
+      Detrended Fluctuation Analysis in the prediction of type 2 diabetes mellitus
+      in patients at risk: Model optimization and comparison with other metrics
+    authors:
+      - given-names: Ana
+        family-names: Colás
+      - given-names: Luis
+        family-names: Vigil
+      - given-names: Borja
+        family-names: Vargas
+      - given-names: David
+        family-names: Cuesta-Frau
+      - given-names: Manuel
+        family-names: Varela
+    journal: PLOS ONE
+    year: 2019
+    volume: 14
+    issue: 12
+    doi: "10.1371/journal.pone.0225817"
+  - type: data
+    title: "S1 File. Glucose time series and clinical database"
+    authors:
+      - given-names: Ana
+        family-names: Colás
+      - given-names: Luis
+        family-names: Vigil
+      - given-names: Borja
+        family-names: Vargas
+      - given-names: David
+        family-names: Cuesta-Frau
+      - given-names: Manuel
+        family-names: Varela
+    year: 2019
+    publisher:
+      name: PLOS
+    doi: "10.1371/journal.pone.0225817.s001"
+    license: CC-BY-4.0
