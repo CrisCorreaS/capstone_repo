@@ -1,6 +1,9 @@
 ---
 title: "CGM data quality and participant retention"
 bibliography: references.bib
+format:
+  html:
+    css: report.css
 ---
 
 ```{python}
@@ -13,6 +16,7 @@ import platform
 
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
 
 project_root = Path.cwd().resolve()
 if not (project_root / "src/data_utils.py").is_file():
@@ -53,6 +57,11 @@ participant_count = len(patients)
 raw_record_count = int(n_points_series.sum())
 selected_count = int(quality_counts["good"])
 selected_proportion = selected_count / participant_count
+record_frequencies = n_points_series.value_counts().sort_index()
+raw_frequency_summary = "; ".join(
+    f"{count:,} participants have {records:,} raw records"
+    for records, count in record_frequencies.items()
+)
 ```
 
 **How many participants are retained by the existing CGM data-quality criteria?**
@@ -62,6 +71,36 @@ The inputs are the S1 glucose time series and clinical database [@colas2019data]
 ## Inputs and implemented criteria
 
 The existing loader reads **`{python} participant_count` participants**, **`{python} f"{raw_record_count:,}"` raw CGM records** and **`{python} len(clinical)` clinical rows**. These are counts of the supplied inputs, before standardisation or interpolation.
+
+```{python}
+#| label: fig-raw-records
+#| out-width: "100%"
+#| fig-cap: "Participants by raw CGM record count, before standardisation or interpolation. Bar-end labels give exact participant frequencies."
+#| fig-alt: "Horizontal bar chart showing participant frequency for each observed raw CGM record count, ordered numerically from top to bottom. Exact participant counts appear at the bar ends. All participants are included before standardisation or interpolation."
+fig, ax = plt.subplots(
+    figsize=(8, max(2.2, 0.6 * len(record_frequencies) + 0.8)),
+    facecolor="white",
+)
+positions = range(len(record_frequencies))
+bars = ax.barh(positions, record_frequencies.to_numpy(), height=0.55, color="#BC2351")
+ax.set_yticks(positions, labels=[f"{records:,} records" for records in record_frequencies.index])
+ax.invert_yaxis()
+ax.set_xlim(0, record_frequencies.max() * 1.18)
+ax.xaxis.set_major_locator(MaxNLocator(nbins=5, integer=True))
+ax.set_axisbelow(True)
+ax.grid(axis="x", color="#e8e2e5", linewidth=0.7)
+ax.bar_label(bars, fmt=lambda count: f"{count:,.0f}", padding=5, fontsize=9)
+ax.set_xlabel("Participants", fontsize=10)
+ax.set_title("Raw CGM record counts", fontsize=11, fontweight="normal")
+ax.tick_params(axis="both", labelsize=9)
+ax.tick_params(axis="y", length=0)
+ax.spines[["top", "right", "left"]].set_visible(False)
+ax.spines["bottom"].set_color("#b8adb1")
+plt.tight_layout()
+plt.show()
+```
+
+@fig-raw-records summarises the raw inputs for all participants: `{python} raw_frequency_summary`. Raw counts include duplicate timestamps and do not directly measure monitoring duration. A larger raw-record count does not itself imply better data quality or selection.
 
 Notebook 01 removes the reading-index column, averages glucose values sharing the same time string and places each series on a five-minute grid between its earliest and latest time. Missingness is the percentage of missing glucose values on that grid, before interpolation.
 
@@ -83,21 +122,6 @@ print("| Final classification | Participants |")
 print("|:--|--:|")
 for category, count in quality_counts.items():
     print(f"| {category} | {count} |")
-```
-
-@fig-raw-records reproduces the raw-record histogram from notebook 01. Raw record counts include duplicate timestamps and do not directly measure monitoring duration.
-
-```{python}
-#| label: fig-raw-records
-#| fig-cap: "Distribution of raw CGM record counts per participant, before standardisation."
-#| fig-alt: "Histogram of raw CGM record counts per participant, with record count on the horizontal axis and participant frequency on the vertical axis. Duplicate timestamps are included."
-plt.figure(figsize=(10, 4))
-plt.hist(n_points_series, bins=20, edgecolor="black")
-plt.xlabel("Number of CGM points")
-plt.ylabel("Frequency")
-plt.title("Distribution of number of points per patient")
-plt.tight_layout()
-plt.show()
 ```
 
 ## Limitations and runtime
