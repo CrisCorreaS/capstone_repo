@@ -15,9 +15,12 @@ nbclient = "==0.11.0"
 nbformat = "==5.11.1"
 jupyter_client = "==8.10.0"
 ipykernel = "==7.4.0"
+quarto = ">=1.11.9,<1.12"
 
 [tasks]
 download-data = "python -B src/download_data.py"
 analyse = "python -I -B src/reproduce.py --analyse-only"
 reproduce = "python -I -B src/reproduce.py"
 check-outputs = "python -I -B src/check_outputs.py"
+quarto = "python -I -B src/quarto.py"
+report = "python -I -B src/quarto.py render reports/cgm-report.qmd"

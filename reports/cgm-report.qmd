@@ -1,0 +1,111 @@
+---
+title: "CGM data quality and participant retention"
+bibliography: references.bib
+---
+
+```{python}
+#| label: load-report-inputs
+#| include: false
+import sys
+from pathlib import Path
+from importlib.metadata import version
+import platform
+
+import pandas as pd
+import matplotlib.pyplot as plt
+
+project_root = Path.cwd().resolve()
+if not (project_root / "src/data_utils.py").is_file():
+    raise RuntimeError("Render this report with execution relative to the project root.")
+sys.path.insert(0, str(project_root))
+from src.analysis_config import load_analysis_config
+from src.data_utils import load_dataset
+
+quality_config = load_analysis_config(project_root)["quality"]
+quality_path = project_root / "data/processed/quality_summary.csv"
+if not quality_path.is_file():
+    raise FileNotFoundError(
+        "Required analysis output is missing: data/processed/quality_summary.csv. "
+        "Run pixi run reproduce before rendering this report."
+    )
+try:
+    clinical, patients = load_dataset(data_path=project_root / "data/raw")
+except FileNotFoundError as error:
+    raise FileNotFoundError(f"Required raw input is missing: {error}") from error
+quality = pd.read_csv(quality_path)
+required_columns = {"case_id", "final_quality_v2"}
+if not required_columns.issubset(quality.columns):
+    raise ValueError("quality_summary.csv requires case_id and final_quality_v2 columns.")
+if (quality["case_id"].isna().any()
+        or not pd.api.types.is_integer_dtype(quality["case_id"])
+        or not quality["case_id"].is_unique
+        or set(quality["case_id"]) != set(patients)):
+    raise ValueError("quality_summary.csv must contain one row per raw participant.")
+categories = ["good", "medium", "bad"]
+if not quality["final_quality_v2"].isin(categories).all():
+    raise ValueError("final_quality_v2 must contain only good, medium or bad.")
+quality_counts = quality["final_quality_v2"].value_counts().reindex(categories, fill_value=0)
+
+# Keep the raw-record calculation used in notebook 01.
+n_points = {case_id: len(df) for case_id, df in patients.items()}
+n_points_series = pd.Series(n_points, name="n_points")
+participant_count = len(patients)
+raw_record_count = int(n_points_series.sum())
+selected_count = int(quality_counts["good"])
+selected_proportion = selected_count / participant_count
+```
+
+**How many participants are retained by the existing CGM data-quality criteria?**
+
+The inputs are the S1 glucose time series and clinical database [@colas2019data]. The study recruited people with essential hypertension and no previous diabetes diagnosis in Spain [@colas2019]. The dataset is available under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), as recorded in `metadata/sources.tsv`.
+
+## Inputs and implemented criteria
+
+The existing loader reads **`{python} participant_count` participants**, **`{python} f"{raw_record_count:,}"` raw CGM records** and **`{python} len(clinical)` clinical rows**. These are counts of the supplied inputs, before standardisation or interpolation.
+
+Notebook 01 removes the reading-index column, averages glucose values sharing the same time string and places each series on a five-minute grid between its earliest and latest time. Missingness is the percentage of missing glucose values on that grid, before interpolation.
+
+The notebook compares edge windows of `{python} quality_config["edge_window_samples"]` and `{python} quality_config["selection_edge_window_samples"]` samples. Its final classification, `final_quality_v2`, uses the latter window:
+
+- Any missing sample in the start window, or more than `{python} quality_config["terminal_missing_samples"]` missing samples in the end window, gives `bad`.
+- Otherwise, missingness below `{python} quality_config["good_missing_pct_threshold"]`% gives `good`; missingness below `{python} quality_config["medium_missing_pct_threshold"]`% gives `medium`; all remaining cases are `bad`. Both upper bounds are exclusive.
+- Only `good` participants are retained. Their glucose series are then interpolated using the notebook's existing pandas `interpolate()` call.
+
+## Retention
+
+**`{python} selected_count` of `{python} participant_count` participants (`{python} f"{selected_proportion:.1%}"`) are retained.** @tbl-final-quality counts the saved final labels in `data/processed/quality_summary.csv`; this report does not recompute the selection algorithm.
+
+```{python}
+#| label: tbl-final-quality
+#| tbl-cap: "Participant counts by final data-quality classification."
+#| output: asis
+print("| Final classification | Participants |")
+print("|:--|--:|")
+for category, count in quality_counts.items():
+    print(f"| {category} | {count} |")
+```
+
+@fig-raw-records reproduces the raw-record histogram from notebook 01. Raw record counts include duplicate timestamps and do not directly measure monitoring duration.
+
+```{python}
+#| label: fig-raw-records
+#| fig-cap: "Distribution of raw CGM record counts per participant, before standardisation."
+#| fig-alt: "Histogram of raw CGM record counts per participant, with record count on the horizontal axis and participant frequency on the vertical axis. Duplicate timestamps are included."
+plt.figure(figsize=(10, 4))
+plt.hist(n_points_series, bins=20, edgecolor="black")
+plt.xlabel("Number of CGM points")
+plt.ylabel("Frequency")
+plt.title("Distribution of number of points per patient")
+plt.tight_layout()
+plt.show()
+```
+
+## Limitations and runtime
+
+These rules describe this analysis's selection process; their clinical validity is not assessed here. Timestamps contain times of day without calendar dates, and standardisation combines repeated time strings. The terminal allowance counts missing samples only within the final `{python} quality_config["selection_edge_window_samples"]` samples, not the full terminal gap. When the allowance equals or exceeds that window, this end condition cannot exclude a participant.
+
+The summary does not record which configuration produced it. The criteria above describe the current configuration; the saved outputs must be regenerated after configuration changes. This report describes data quality and retention, rather than the subsequent clinical or statistical analysis.
+
+Rendered with Quarto {{< version >}}, Python `{python} platform.python_version()`, pandas `{python} version("pandas")`, NumPy `{python} version("numpy")`, Matplotlib `{python} version("matplotlib")` and ipykernel `{python} version("ipykernel")` on `{python} platform.system()` `{python} platform.machine()`. Counts and the figure are computed in a fresh session using the locked environment.
+
+## References

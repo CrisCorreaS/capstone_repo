@@ -134,6 +134,23 @@ def analyse(analysis_config, diagnostics):
     print("Processed data and result tables regenerated.", flush=True)
 
 
+def render_report():
+    """Render the report using the active environment and existing outputs."""
+    print("Rendering the CGM data-quality report...", flush=True)
+    try:
+        subprocess.run(
+            [sys.executable, "-I", "-B", str(PROJECT_ROOT / "src/quarto.py"),
+             "render", "reports/cgm-report.qmd"],
+            cwd=PROJECT_ROOT, check=True,
+        )
+    except subprocess.CalledProcessError as error:
+        raise RuntimeError(f"Report rendering failed (exit code {error.returncode}).") from error
+    report = PROJECT_ROOT / "reports/cgm-report.html"
+    if not report.is_file() or report.stat().st_size == 0:
+        raise RuntimeError(f"Report rendering did not produce a non-empty HTML file: {report}")
+    print(f"Report created: {report}", flush=True)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Run the CGM analysis or complete reproduction.")
     parser.add_argument(
@@ -167,6 +184,7 @@ def main(argv=None):
         if not args.analyse_only:
             print("Validating generated outputs...", flush=True)
             check_outputs()
+            render_report()
             print("Reproduction completed.", flush=True)
         return 0
     except Exception as error:

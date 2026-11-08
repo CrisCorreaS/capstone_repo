@@ -1,0 +1,19 @@
+project:
+  type: default
+  render:
+    - reports/cgm-report.qmd
+  execute-dir: project
+
+format:
+  html:
+    embed-resources: true
+
+jupyter: python3
+execute:
+  echo: false
+  error: false
+  cache: false
+  freeze: false
+  daemon: false
+
+lang: en-GB
