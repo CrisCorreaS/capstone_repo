@@ -1,73 +1,88 @@
-# Diabetes CGM Analysis Project
+# Reproducible CGM Analysis
 
-This repository is a fork of [Martin Rivero’s CGM analysis project](https://github.com/martinrivero15/cgm-variability-analysis). It explores continuous glucose monitoring (CGM) data, drawing on the following paper:
+[![Reproduce workflow status on main for push events](https://img.shields.io/github/actions/workflow/status/CrisCorreaS/capstone_repo/reproduce.yml?branch=main&event=push&style=flat&label=Reproduce&labelColor=000000&color=CF3D69)](https://github.com/CrisCorreaS/capstone_repo/actions/workflows/reproduce.yml) [![Python: 3.12](https://img.shields.io/static/v1?label=Python&message=3.12&style=flat&labelColor=000000&color=C93260)](pixi.toml) [![Code licence: MIT](https://img.shields.io/static/v1?label=Code%20licence&message=MIT&style=flat&labelColor=000000&color=BC2351)](LICENSE) [![Open issues in capstone_repo](https://img.shields.io/github/issues/CrisCorreaS/capstone_repo?style=flat&label=Issues&labelColor=000000&color=A51F47)](https://github.com/CrisCorreaS/capstone_repo/issues)
 
-[**Detrended Fluctuation Analysis in the prediction of type 2 diabetes mellitus in patients at risk: Model optimization and comparison with other metrics**](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0225817)
+This capstone for *The Art of Reproducible and Open Science* makes an existing continuous glucose monitoring (CGM) analysis reproducible. It builds on [Martin Rivero's original analysis](https://github.com/martinrivero15/cgm-variability-analysis). I added a locked environment, verified data acquisition, configurable execution and a generated Quarto report while preserving his scientific calculations.
 
-The original project aims to develop an analysis pipeline for future research into diabetes and distress. This fork focuses on improving its reproducibility as part of the "The Art of Reproducible and Open Science" course capstone project.
+The analysis draws on Colás et al. (2019), [*Detrended Fluctuation Analysis in the prediction of type 2 diabetes mellitus in patients at risk: Model optimization and comparison with other metrics*](https://doi.org/10.1371/journal.pone.0225817). Regenerating this implementation does not establish full replication of the paper or independent scientific validation.
 
-## Objectives
-The project implements several analyses described in the article:
+## Requirements
 
-- Visualisation of glucose time series for individual patients
-- Aggregated glucose curves by group
-- Calculation of glucose variability metrics
-- Entropy and non-linear measures
-- Detrended Fluctuation Analysis (DFA)
-- Quality reports per patient/day
-- Summary tables
-- Principal Component Analysis (PCA)
+> [!IMPORTANT]
+> I currently support Windows AMD64 (`win-64`) only. The Quarto helper requires an ASCII-only system temporary-directory path.
 
-## Project Structure
-- `data/raw` — Original data
-- `data/processed` — Processed data
-- `notebooks` — Jupyter notebooks for exploration, metrics and visualization
-- `src` — Python scripts for utilities, metrics, DFA, plots and reports
-- `results/figures` — Generated figures
-- `results/tables` — Generated tables
+Local validation used Windows AMD64 with Pixi 0.83.0; CI uses `windows-2025`. I have not validated Linux or macOS.
 
-## Planned Analyses
+Install [Pixi](https://pixi.prefix.dev/#installation), which supplies Python, Quarto and the locked dependencies. You need Git for the clone command below and internet access for initial installation and data acquisition. I have not benchmarked minimum RAM, required disk space or typical runtime.
 
-### Visualisations
-- Glucose vs time for individual patients
-- Clinical glucose range bands
-- Aggregated curves by group (median + percentile bands)
+## Reproduce
 
-### Metrics
-- Mean glucose
-- Standard deviation
-- Coefficient of variation
-- MAGE
-- CONGA-2
-- Glycaemic Fluctuation Index
-- Time below 100 mg/dL (TU100)
-- Area above 140 mg/dL (AO140)
-
-### Non-linear measures
-
-- Approximate entropy (ApEn)
-- Sample entropy (SampEn)
-- Poincaré plot measures (SD1 and SD2)
-
-### DFA
-
-- DFAraw
-- DFAint
-- Window and segment analysis
-
-### Statistical Analysis
-- Principal Component Analysis (PCA)
-
-## Environment and initial validation
-
-### Prerequisites
-Install Pixi using the [official installation instructions](https://pixi.prefix.dev/#installation).
-
-The environment is configured for 64-bit Windows (`win-64`) and has been tested on Windows AMD64 with Pixi 0.83.0. Pixi installs Python and the required packages for this project.
-
-### Environment setup
-Open PowerShell in the repository root and run:
+Open PowerShell in the directory where you want to keep the project, then clone it and run:
 
 ```powershell
+git clone https://github.com/CrisCorreaS/capstone_repo.git
+cd capstone_repo
 pixi install --locked
+pixi run --locked reproduce
 ```
+
+Run the Pixi commands from the repository root, containing `pixi.toml`.
+
+[pixi.toml](pixi.toml) defines dependency constraints and tasks; [pixi.lock](pixi.lock) records the resolved environment. Reproduction validates configuration, downloads or verifies raw inputs, executes both notebooks in fresh kernels, validates generated outputs and renders the report. Rerunning it replaces recognised generated analysis CSVs. Execution copies and diagnostic logs are kept in a temporary directory whose location is printed.
+
+Open `reports/cgm-report.html` locally after success. Successful [Reproduce workflow runs](https://github.com/CrisCorreaS/capstone_repo/actions/workflows/reproduce.yml) provide downloadable `cgm-report` and `result-tables` artefacts retained for seven days.
+
+## Expected outputs and report
+
+The verified baseline for the **default configuration** is **208 participants**, **114,912 raw records** and **114 retained participants (54.8%)**.
+
+With these settings, `pixi run --locked reproduce` produces **118 CSVs**: 114 interpolated participant files named `data/processed/interpolated/case_<id>.csv`, `data/processed/quality_summary.csv` and three tables under `results/tables/`: `metrics_summary.csv`, `final_dataset.csv` and `group_comparison.csv`. The CSV total can change with valid configuration choices.
+
+The self-contained Quarto report demonstrates one result of the workflow: **How many participants are retained by the existing CGM data-quality criteria?** It presents retention counts, classifications and a horizontal bar chart of participants by raw record count. Raw counts include duplicate timestamps and do not measure monitoring duration. See the [report source](reports/cgm-report.qmd) and metadata below for methodological limitations.
+
+[![Preview of the CGM report showing the input summary and a horizontal bar chart of participants by raw record count.](assets/cgm-report-preview.png)](assets/cgm-report-preview.png)
+
+*Preview of the Quarto report with the default configuration.*
+
+## Tasks and configuration
+
+Run individual tasks as `pixi run --locked <task>` from the repository root:
+
+| Task | Behaviour |
+| --- | --- |
+| `download-data` | Acquire or verify raw inputs and protect them as read-only. |
+| `analyse` | Verify existing raw inputs and execute both notebooks; no download or report. |
+| `check-outputs` | Check raw totals and expected CSV paths without changing files. |
+| `report` | Render the report using existing raw inputs and analysis outputs. |
+| `quarto` | Use the Windows-compatible launcher, for example `pixi run --locked quarto --version`. |
+
+[config/analysis.toml](config/analysis.toml) controls quality thresholds and windows, entropy and DFA settings, gap detection and notebook timeouts. Rerun reproduction after changing settings. Saved outputs do not record which settings were used.
+
+## Repository contents
+
+| Location | Contents |
+| --- | --- |
+| `src/` | Data loading, acquisition, analysis utilities and execution tools. |
+| `notebooks/` | Data exploration followed by metrics analysis. |
+| `config/` | Analysis and execution settings. |
+| `metadata/` | Provenance, checksums, participant mapping and variable definitions. |
+| `reports/` | Quarto source and bibliography; generated HTML after rendering. |
+| `data/raw/` | Downloaded original inputs. |
+| `data/processed/` | Generated participant CSVs and quality summary. |
+| `results/tables/` | Generated analysis tables. |
+
+## Data availability
+
+The public S1 dataset, *Glucose time series and clinical database* ([DOI: 10.1371/journal.pone.0225817.s001](https://doi.org/10.1371/journal.pone.0225817.s001)), is distributed under CC BY 4.0. Raw files are downloaded, verified and kept read-only. Raw data and generated analysis outputs are excluded from version control.
+
+Consult the [source records](metadata/sources.tsv), [expected checksums](metadata/checksums.sha256), [participant mapping](metadata/samples.tsv) and [data dictionary](metadata/data_dictionary.md).
+
+## Licensing
+
+Code and code blocks remain under the [MIT licence](LICENSE), preserving “Copyright (c) 2026 Martin Rivero”. Inherited documentation retains its existing terms and attribution.
+
+Original report prose and original figures contributed by this fork are licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), crediting Cristina Correa Segade. This declaration leaves inherited and third-party licences and attribution unchanged; the software licence does not apply to the source dataset.
+
+## Citation and contact
+
+Use [CITATION.cff](CITATION.cff) to cite this software. You can reach me through [GitHub issues](https://github.com/CrisCorreaS/capstone_repo/issues). For reproduction problems, use the [reproducibility form](https://github.com/CrisCorreaS/capstone_repo/issues/new?template=reproducibility_problem.yml). Read [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) before participating.
