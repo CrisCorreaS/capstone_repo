@@ -13,7 +13,20 @@ permissions:
 
 jobs:
   reproduce:
-    runs-on: windows-2025
+    name: Reproduce (${{ matrix.platform }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: win-64
+            runner: windows-2025
+          - platform: linux-64
+            runner: ubuntu-24.04
+          - platform: osx-64
+            runner: macos-15-intel
+          - platform: osx-arm64
+            runner: macos-15
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     defaults:
       run:
@@ -33,12 +46,26 @@ jobs:
 
       - name: Install locked environment
         run: |
+          $lockHash = (Get-FileHash pixi.lock -Algorithm SHA256).Hash
           pixi install --locked
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash pixi.lock -Algorithm SHA256).Hash -ne $lockHash) {
+            throw 'Locked installation changed pixi.lock'
+          }
+
+      - name: Confirm native platform
+        run: |
+          pixi run --locked python -I -B -c "import platform, sys; actual = {'win32': 'win', 'linux': 'linux', 'darwin': 'osx'}[sys.platform] + ('-arm64' if platform.machine().lower() in ('arm64', 'aarch64') else '-64'); print(actual); assert actual == '${{ matrix.platform }}', actual"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Check launcher and synthetic Jupyter render
+        run: |
+          pixi run --locked python -I -B tests/test_quarto.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Reproduce analysis and report
         run: |
-          pixi run reproduce
+          pixi run --locked reproduce
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Check raw data totals and generated CSVs
@@ -58,7 +85,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: cgm-report
+          name: cgm-report-${{ matrix.platform }}
           path: reports/cgm-report.html
           if-no-files-found: error
           retention-days: 7
@@ -67,7 +94,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: result-tables
+          name: result-tables-${{ matrix.platform }}
           path: results/tables/*.csv
           if-no-files-found: warn
           retention-days: 7
