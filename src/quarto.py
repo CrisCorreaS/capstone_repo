@@ -60,17 +60,20 @@ def render(command, env):
 
 
 def main():
-    library = Path(sys.prefix) / "Library"
+    windows = sys.platform == "win32"
+    library = Path(sys.prefix) / "Library" if windows else Path(sys.prefix)
     binary = library / "bin"
     share = library / "share/quarto"
+    executable_suffix = ".exe" if windows else ""
+    library_suffix = ".dll" if windows else ".dylib" if sys.platform == "darwin" else ".so"
     tools = {
-        "QUARTO_DENO": binary / "deno.exe",
-        "QUARTO_DENO_DOM": library / "lib/deno_dom.dll",
-        "QUARTO_PANDOC": binary / "pandoc.exe",
-        "QUARTO_ESBUILD": binary / "esbuild.exe",
-        "QUARTO_DART_SASS": binary / "sass.exe",
-        "QUARTO_TYPST": binary / "typst.exe",
-        "QUARTO_TYPST_GATHER": binary / "typst-gather.exe",
+        "QUARTO_DENO": binary / f"deno{executable_suffix}",
+        "QUARTO_DENO_DOM": library / "lib" / f"deno_dom{library_suffix}",
+        "QUARTO_PANDOC": binary / f"pandoc{executable_suffix}",
+        "QUARTO_ESBUILD": binary / f"esbuild{executable_suffix}",
+        "QUARTO_DART_SASS": binary / f"sass{executable_suffix}",
+        "QUARTO_TYPST": binary / f"typst{executable_suffix}",
+        "QUARTO_TYPST_GATHER": binary / f"typst-gather{executable_suffix}",
     }
     script = binary / "quarto.js"
     for path in (*tools.values(), script, share / "version"):
@@ -104,7 +107,7 @@ def main():
     ]
     try:
         with tempfile.TemporaryDirectory(prefix="quarto-resources-") as temporary:
-            if not temporary.isascii():
+            if windows and not temporary.isascii():
                 raise OSError("Quarto requires an ASCII temporary-directory path on Windows")
             resources = Path(temporary) / "share"
             shutil.copytree(share, resources)
