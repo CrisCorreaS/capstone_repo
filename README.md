@@ -2,35 +2,33 @@
 
 [![Reproduce workflow status on main for push events](https://img.shields.io/github/actions/workflow/status/CrisCorreaS/capstone_repo/reproduce.yml?branch=main&event=push&style=flat&label=Reproduce&labelColor=000000&color=CF3D69)](https://github.com/CrisCorreaS/capstone_repo/actions/workflows/reproduce.yml) [![Python: 3.12](https://img.shields.io/static/v1?label=Python&message=3.12&style=flat&labelColor=000000&color=C93260)](pixi.toml) [![Code licence: MIT](https://img.shields.io/static/v1?label=Code%20licence&message=MIT&style=flat&labelColor=000000&color=BC2351)](LICENSE) [![Open issues in capstone_repo](https://img.shields.io/github/issues/CrisCorreaS/capstone_repo?style=flat&label=Issues&labelColor=000000&color=A51F47)](https://github.com/CrisCorreaS/capstone_repo/issues)
 
-This capstone for *The Art of Reproducible and Open Science* makes an existing continuous glucose monitoring (CGM) analysis reproducible. It builds on [Martin Rivero's original analysis](https://github.com/martinrivero15/cgm-variability-analysis). I added a locked environment, verified data acquisition, configurable execution and a generated Quarto report while preserving his scientific calculations.
+For my capstone in *The Art of Reproducible and Open Science*, I made [Martin Rivero’s CGM analysis](https://github.com/martinrivero15/cgm-variability-analysis) reproducible with a locked environment, verified downloads, configurable execution and a Quarto report.
 
-The analysis draws on Colás et al. (2019), [*Detrended Fluctuation Analysis in the prediction of type 2 diabetes mellitus in patients at risk: Model optimization and comparison with other metrics*](https://doi.org/10.1371/journal.pone.0225817). Regenerating this implementation does not establish full replication of the paper or independent scientific validation.
+The analysis draws on [Colás et al. (2019)](https://doi.org/10.1371/journal.pone.0225817). Regenerating this implementation does not establish full replication of the paper or independent scientific validation.
 
-## Requirements
+## Hardware and software requirements
+
+Install [Git](https://git-scm.com/downloads) and [Pixi](https://pixi.prefix.dev/#installation). Pixi supplies Python, Quarto and the dependencies recorded in [pixi.lock](pixi.lock).
+
+Reproduction is tested in CI on Windows x86-64, Linux x86-64 and macOS Intel and Apple Silicon. You can run the analysis locally on the supported platforms without a GPU. You’ll need an internet connection to install the environment and download the data.
 
 > [!IMPORTANT]
-> I currently support Windows AMD64 (`win-64`) only. The Quarto helper requires an ASCII-only system temporary-directory path.
-
-Local validation used Windows AMD64 with Pixi 0.83.0; CI uses `windows-2025`. I have not validated Linux or macOS.
-
-Install [Pixi](https://pixi.prefix.dev/#installation), which supplies Python, Quarto and the locked dependencies. You need Git for the clone command below and internet access for initial installation and data acquisition. I have not benchmarked minimum RAM, required disk space or typical runtime.
+> On Windows, the system temporary-directory path must contain only ASCII characters.
 
 ## Reproduce
 
-Open PowerShell in the directory where you want to keep the project, then clone it and run:
+Open a terminal where you want to keep the project:
 
-```powershell
+```
 git clone https://github.com/CrisCorreaS/capstone_repo.git
 cd capstone_repo
 pixi install --locked
 pixi run --locked reproduce
 ```
 
-Run the Pixi commands from the repository root, containing `pixi.toml`.
+This downloads and verifies the data, executes both notebooks, checks the outputs and renders the report. Subsequent runs replace recognised generated CSVs. Diagnostic log locations are printed in the terminal.
 
-[pixi.toml](pixi.toml) defines dependency constraints and tasks; [pixi.lock](pixi.lock) records the resolved environment. Reproduction validates configuration, downloads or verifies raw inputs, executes both notebooks in fresh kernels, validates generated outputs and renders the report. Rerunning it replaces recognised generated analysis CSVs. Execution copies and diagnostic logs are kept in a temporary directory whose location is printed.
-
-Open `reports/cgm-report.html` locally after success. Successful [Reproduce workflow runs](https://github.com/CrisCorreaS/capstone_repo/actions/workflows/reproduce.yml) provide downloadable `cgm-report` and `result-tables` artefacts retained for seven days.
+Open `reports/cgm-report.html` in your browser. Successful [CI runs](https://github.com/CrisCorreaS/capstone_repo/actions/workflows/reproduce.yml) also retain reports and tables as platform-specific artefacts for seven days.
 
 ## Expected outputs and report
 
@@ -54,7 +52,7 @@ Run individual tasks as `pixi run --locked <task>` from the repository root:
 | `analyse` | Verify existing raw inputs and execute both notebooks; no download or report. |
 | `check-outputs` | Check raw totals and expected CSV paths without changing files. |
 | `report` | Render the report using existing raw inputs and analysis outputs. |
-| `quarto` | Use the Windows-compatible launcher, for example `pixi run --locked quarto --version`. |
+| `quarto` | Run Quarto through the project launcher. |
 
 [config/analysis.toml](config/analysis.toml) controls quality thresholds and windows, entropy and DFA settings, gap detection and notebook timeouts. Rerun reproduction after changing settings. Saved outputs do not record which settings were used.
 
@@ -66,7 +64,8 @@ Run individual tasks as `pixi run --locked <task>` from the repository root:
 | `notebooks/` | Data exploration followed by metrics analysis. |
 | `config/` | Analysis and execution settings. |
 | `metadata/` | Provenance, checksums, participant mapping and variable definitions. |
-| `reports/` | Quarto source and bibliography; generated HTML after rendering. |
+| `reports/` | Quarto source and bibliography; generated HTML after rendering.
+| `tests/`| Automated checks for data acquisition and Quarto execution. |
 | `data/raw/` | Downloaded original inputs. |
 | `data/processed/` | Generated participant CSVs and quality summary. |
 | `results/tables/` | Generated analysis tables. |
@@ -79,10 +78,12 @@ Consult the [source records](metadata/sources.tsv), [expected checksums](metadat
 
 ## Licensing
 
-Code and code blocks remain under the [MIT licence](LICENSE), preserving “Copyright (c) 2026 Martin Rivero”. Inherited documentation retains its existing terms and attribution.
+Code and code blocks remain under the [MIT licence](LICENSE), preserving “Copyright (c) 2026 Martin Rivero”. New general repository documentation, including this README, uses the same licence. Inherited documentation retains its existing terms and attribution.
 
 Original report prose and original figures contributed by this fork are licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), crediting Cristina Correa Segade. This declaration leaves inherited and third-party licences and attribution unchanged; the software licence does not apply to the source dataset.
 
 ## Citation and contact
 
-Use [CITATION.cff](CITATION.cff) to cite this software. You can reach me through [GitHub issues](https://github.com/CrisCorreaS/capstone_repo/issues). For reproduction problems, use the [reproducibility form](https://github.com/CrisCorreaS/capstone_repo/issues/new?template=reproducibility_problem.yml). Read [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) before participating.
+Use [CITATION.cff](CITATION.cff) to cite this software. A test archive of the Windows-only v0.1.0 release is available on [Zenodo Sandbox](https://sandbox.zenodo.org/records/637660).
+
+You can reach me through [GitHub issues](https://github.com/CrisCorreaS/capstone_repo/issues). For reproduction problems, use the [reproducibility form](https://github.com/CrisCorreaS/capstone_repo/issues/new?template=reproducibility_problem.yml). Read [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) before participating.
