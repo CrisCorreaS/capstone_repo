@@ -250,7 +250,7 @@ def main(argv=None):
         else:
             print("Downloading the S1 archive and verifying all 210 files...", flush=True)
             with tempfile.TemporaryDirectory(prefix="cgm-download-") as folder:
-                staged = stage_archive(url, archive_md5, mappings, checksums, Path(folder))
+                staged = stage_archive(url, archive_md5, mappings, checksums, Path(folder).resolve(strict=True))
                 publish(destination, staged, checksums)
             print(f"Downloaded and verified all 210 files in {destination}. Files are read-only.")
         return 0

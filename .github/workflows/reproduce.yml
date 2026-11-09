@@ -58,9 +58,9 @@ jobs:
           pixi run --locked python -I -B -c "import platform, sys; actual = {'win32': 'win', 'linux': 'linux', 'darwin': 'osx'}[sys.platform] + ('-arm64' if platform.machine().lower() in ('arm64', 'aarch64') else '-64'); print(actual); assert actual == '${{ matrix.platform }}', actual"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: Check launcher and synthetic Jupyter render
+      - name: Check acquisition, launcher and synthetic Jupyter render
         run: |
-          pixi run --locked python -I -B tests/test_quarto.py
+          pixi run --locked python -I -B -m unittest discover -s tests -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Reproduce analysis and report
